@@ -7,6 +7,11 @@
 #include <windows.h>  // windows system api
 #include <WinSock2.h> // windows socket api 
 
+struct DataPackage {
+    int age;
+    char name[32];
+};
+
 int main()
 {
     // launch windows socket 2.x environment
@@ -59,7 +64,8 @@ int main()
         
         if (nlen > 0) {
             std::cout << "received message from server: ";
-            std::cout << recvBuf << std::endl;
+            DataPackage* dp = (DataPackage*)recvBuf;
+            std::cout << dp -> age << " and " << dp -> name << std::endl;
         }
 
     }

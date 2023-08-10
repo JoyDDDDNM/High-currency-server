@@ -9,6 +9,11 @@
 #include <windows.h>  // windows system api
 #include <WinSock2.h> // windows socket api 
 
+struct DataPackage {
+    int age;
+    char name[32];
+};
+
 int main() {
     // launch windows socket 2.x environment
     WORD ver = MAKEWORD(2, 2);
@@ -69,8 +74,6 @@ int main() {
 
     SOCKET _cSock = INVALID_SOCKET;
 
-    char msgBuf[] = "Hello, I'm server...";
-
     _cSock = accept(_sock, (sockaddr*)&clientAddr, &nAddrLen);
     if (INVALID_SOCKET == _cSock) {
         std::cout << "Invalid Socket accepted" << std::endl;
@@ -83,6 +86,7 @@ int main() {
     // send(_cSock,msgBuf,strlen(msgBuf)+1,0);
 
     char _recvBuf[128] = {};
+    DataPackage dp = {};
     while (true) {
         // 5. keeping reading message from clients
         int nLen = recv(_cSock,_recvBuf,128,0);
@@ -93,20 +97,18 @@ int main() {
         // 6.process client request and send data to client
         // strlen doesn't count the trailiing '\0'
         std::cout << "received message from client: " << _recvBuf << std::endl;
-        if (strcmp(_recvBuf, "getName") == 0) {
+        if (strcmp(_recvBuf, "getInfo") == 0) {
             // using strcpy() to a buffer which is not large enough to contain it,
             // it will cause a buffer overflow. strcpy_s() is a security enhanced 
             // version of strcpy() 
-            strcpy_s(msgBuf, "I'm Rain");
-        }
-        else if (strcmp(_recvBuf, "getAge") == 0) {
-            strcpy_s(msgBuf, "I'm 18 years old");
+            dp = {80,"rain"};
         }
         else {
-            strcpy_s(msgBuf, "Not a valid request");
+            dp = {10000,"not valid"};            
         }
 
-        send(_cSock, msgBuf, strlen(msgBuf) + 1, 0);
+        send(_cSock, (const char*)&dp, sizeof(DataPackage), 0);
+
         
     }
 
