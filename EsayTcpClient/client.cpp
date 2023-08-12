@@ -7,9 +7,53 @@
 #include <windows.h>  // windows system api
 #include <WinSock2.h> // windows socket api 
 
-struct DataPackage {
-    int age;
-    char name[32];
+
+enum CMD {
+    CMD_LOGIN,
+    CMD_LOGIN_RESULT,
+    CMD_LOGOUT,
+    CMD_LOGOUT_RESULT,
+    CMD_ERROR
+};
+
+struct DataHeader {
+    short length;
+    short cmd;
+};
+
+struct Login : public DataHeader {
+    Login() {
+        length = sizeof(Login);
+        cmd = CMD_LOGIN;
+    }
+    char userName[32];
+    char password[32];
+};
+
+struct LoginRet : public DataHeader {
+    LoginRet() {
+        length = sizeof(LoginRet);
+        cmd = CMD_LOGIN_RESULT;
+        result = 0;
+    }
+    int result;
+};
+
+struct Logout : public DataHeader {
+    Logout() {
+        length = sizeof(Logout);
+        cmd = CMD_LOGOUT;
+    }
+    char userName[32];
+};
+
+struct LogoutRet : public DataHeader {
+    LogoutRet() {
+        length = sizeof(LogoutRet);
+        cmd = CMD_LOGOUT_RESULT;
+        result = 0;
+    }
+    int result;
 };
 
 int main()
@@ -48,26 +92,38 @@ int main()
     // 3.process user input request
     char cmdBuf[128] = {};
     while (true) {
+        std::cout << "command<< ";
         std::cin >> cmdBuf;
         if (strcmp(cmdBuf, "exit") == 0) {
             // client exit
             break;
+        } else if  (strcmp(cmdBuf, "login") == 0) {
+            Login login;
+            strcpy_s(login.userName, "account");
+            strcpy_s(login.password, "password");
+
+            send(_sock, (char*)&login, sizeof(Login), 0);
+
+            LoginRet loginRet= {};            
+            recv(_sock, (char*)&loginRet, sizeof(LoginRet), 0);
+            std::cout << "Received message from server: ";
+            std::cout << "Login result : " << loginRet.result << std::endl;
+
+        } else if (strcmp(cmdBuf, "logout") == 0) {
+            Logout logout = {};
+            strcpy_s(logout.userName, "account");
+            send(_sock, (char*)&logout, sizeof(Logout), 0);
+
+            LogoutRet logoutRet = {};
+            recv(_sock, (char*)&logoutRet, sizeof(LogoutRet), 0);
+            std::cout << "Received message from server: ";
+            std::cout << "Logout result : " << logoutRet.result << std::endl;
         }
         else {
-            send(_sock, cmdBuf, strlen(cmdBuf) + 1, 0);
+            // not a valid command, listen next command
+            std::cout << "Not valid command" << std::endl;
+            continue;
         }
-
-        // 4.receive server message
-        char recvBuf[256] = {};
-        int nlen = 0;
-        nlen = recv(_sock, recvBuf, 256, 0);
-        
-        if (nlen > 0) {
-            std::cout << "received message from server: ";
-            DataPackage* dp = (DataPackage*)recvBuf;
-            std::cout << dp -> age << " and " << dp -> name << std::endl;
-        }
-
     }
 
     // 5. close socket 

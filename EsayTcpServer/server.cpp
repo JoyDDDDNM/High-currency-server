@@ -9,9 +9,52 @@
 #include <windows.h>  // windows system api
 #include <WinSock2.h> // windows socket api 
 
-struct DataPackage {
-    int age;
-    char name[32];
+enum CMD {
+    CMD_LOGIN,
+    CMD_LOGIN_RESULT,
+    CMD_LOGOUT,
+    CMD_LOGOUT_RESULT,
+    CMD_ERROR
+};
+
+struct DataHeader {
+    short length; 
+    short cmd;
+};
+
+struct Login: public DataHeader {
+    Login () {
+        length = sizeof(Login);
+        cmd = CMD_LOGIN;
+    }
+    char userName[32];
+    char password[32];
+};
+
+struct LoginRet: public DataHeader {
+    LoginRet() {
+        length = sizeof(LoginRet);
+        cmd = CMD_LOGIN_RESULT;
+        result = 0;
+    }
+    int result;
+};
+
+struct Logout : public DataHeader {
+    Logout() {
+        length = sizeof(Logout);
+        cmd = CMD_LOGOUT;
+    }
+    char userName[32];
+};
+
+struct LogoutRet : public DataHeader {
+    LogoutRet() {
+        length = sizeof(LogoutRet);
+        cmd = CMD_LOGOUT_RESULT;
+        result = 0;
+    }
+    int result;
 };
 
 int main() {
@@ -32,7 +75,6 @@ int main() {
     }
 
     // 2.bind network port
-
     // same struct compared with the standard argument type of bind function, we use type conversion to convert its type
     sockaddr_in _sin = {};
     _sin.sin_family = AF_INET;
@@ -46,14 +88,13 @@ int main() {
     _sin.sin_addr.S_un.S_addr = INADDR_ANY;
     //inet_addr("127.0.0.1");
     
-    
     // 3. listen port 
     // determine if we bind port successfully
     if (SOCKET_ERROR == bind(_sock, (sockaddr*)&_sin, sizeof(sockaddr_in))) {
         std::cout << "ERROR, cannot bind to the specified port number" << std::endl;
     }
     else {
-        std::cout << "successfully bind to the specified port" << std::endl;
+        std::cout << "Successfully bind to the specified port" << std::endl;
     }
     
     // setup the length of queue for pending connection to 5
@@ -61,7 +102,7 @@ int main() {
         std::cout << "ERROR, listen to port failed" << std::endl;
     }
     else {
-        std::cout << "listen to port successully" << std::endl;
+        std::cout << "Listen to port successully" << std::endl;
     }
 
 
@@ -80,36 +121,51 @@ int main() {
     }
         
     // ion converts an (Ipv4) Internet network address into an ASCII string in Internet standard dotted-decimal format
-    std::cout << "new client connected: socket = " << _cSock << ", ip = " << inet_ntoa(clientAddr.sin_addr) << std::endl;
-
-    // tell client connection succeeded
-    // send(_cSock,msgBuf,strlen(msgBuf)+1,0);
-
-    char _recvBuf[128] = {};
-    DataPackage dp = {};
+    std::cout << "New client connected: socket = " << _cSock << ", ip = " << inet_ntoa(clientAddr.sin_addr) << std::endl;
+    
     while (true) {
+        DataHeader header = {};
         // 5. keeping reading message from clients
-        int nLen = recv(_cSock,_recvBuf,128,0);
+        int nLen = recv(_cSock,(char*) &header, sizeof(DataHeader), 0);
         if (nLen <= 0) {
             break;
         }
         
         // 6.process client request and send data to client
         // strlen doesn't count the trailiing '\0'
-        std::cout << "received message from client: " << _recvBuf << std::endl;
-        if (strcmp(_recvBuf, "getInfo") == 0) {
-            // using strcpy() to a buffer which is not large enough to contain it,
-            // it will cause a buffer overflow. strcpy_s() is a security enhanced 
-            // version of strcpy() 
-            dp = {80,"rain"};
-        }
-        else {
-            dp = {10000,"not valid"};            
-        }
+        switch (header.cmd) {
+            case CMD_LOGIN: {
+                Login login = {};
+                // modify pointer to points to the member of subclass, since the member of parent class
+                // would be initialized before those of subclass
+                // at the same time, reduce the amount of data we need to read
+                recv(_cSock, (char*) &login + sizeof(DataHeader), sizeof(Login) - sizeof(DataHeader), 0);
+                std::cout << "Received message from client: " << login.cmd << " message length: " << login.length << std::endl;
+                std::cout << "User:" << login.userName << " Password: " << login.password << std::endl;
+                
+                LoginRet ret;
+                // TODO: needs account validation
+                // return header file before sending data
+                send(_cSock, (char*)&ret, sizeof(LoginRet), 0);
 
-        send(_cSock, (const char*)&dp, sizeof(DataPackage), 0);
-
-        
+                break;
+            }
+            case CMD_LOGOUT: {
+                Logout logout = {};
+                recv(_cSock, (char*)&logout + sizeof(DataHeader), sizeof(logout) - sizeof(DataHeader), 0);
+                std::cout << "user:" << logout.userName << std::endl;
+                // TODO: needs account validation
+                LogoutRet ret;
+                send(_cSock, (char*)&ret, sizeof(LogoutRet), 0);
+                break;
+            }
+            default: {
+                header.cmd = CMD_ERROR;
+                header.length = 0;
+                send(_cSock, (char*)&header, sizeof(DataHeader), 0);
+                break;
+            }
+        } 
     }
 
     // 7. close socket
