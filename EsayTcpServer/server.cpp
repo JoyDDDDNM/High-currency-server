@@ -8,6 +8,8 @@
 #include <iostream>
 #include <windows.h>  // windows system api
 #include <WinSock2.h> // windows socket api 
+#include <vector>
+//#include <string>
 
 enum CMD {
     CMD_LOGIN,
@@ -16,6 +18,12 @@ enum CMD {
     CMD_LOGOUT_RESULT,
     CMD_ERROR
 };
+
+std::vector<std::string> allCommands = { "CMD_LOGIN",
+                                        "CMD_LOGIN_RESULT",
+                                        "CMD_LOGOUT",
+                                        "CMD_LOGOUT_RESULT",
+                                        "CMD_ERROR"};
 
 struct DataHeader {
     short length; 
@@ -56,6 +64,62 @@ struct LogoutRet : public DataHeader {
     }
     int result;
 };
+
+int processClient(SOCKET _cSock) {
+
+    // buffer for receiving data, this is still a fixed length buffer
+    char szRecv[1024] = {};
+
+    // 5. keeping reading message from clients
+    //we only read header info from the incoming message
+    int nLen = recv(_cSock, (char*)szRecv, sizeof(DataHeader), 0);
+    DataHeader* header = (DataHeader*)szRecv;
+    if (nLen <= 0) {
+        // connection has closed
+        return -1;
+    }
+
+    //if (nLen >= header->length) {};
+    // 6.process client request and send data to client
+    switch (header->cmd) {
+        case CMD_LOGIN: {
+            // modify pointer to points to the member of subclass, since the member of parent class
+            // would be initialized before those of subclass
+            // at the same time, reduce the amount of data we need to read
+            recv(_cSock, szRecv + sizeof(DataHeader), header->length - sizeof(DataHeader), 0);
+            Login* login = (Login*)szRecv;
+            std::cout << "Received message from client: " << allCommands[login->cmd] << " message length: " << login->length << std::endl;
+            std::cout << "User: " << login->userName << " Password: " << login->password << std::endl;
+
+            LoginRet ret;
+            // TODO: needs account validation
+            // return header file before sending data
+            send(_cSock, (char*)&ret, sizeof(LoginRet), 0);
+
+            break;
+        }
+        case CMD_LOGOUT: {
+            recv(_cSock, szRecv + sizeof(DataHeader), header->length - sizeof(DataHeader), 0);
+            Logout* logout = (Logout*)szRecv;
+            std::cout << "Received message from client: " << allCommands[logout->cmd] << " message length: " << logout->length << std::endl;
+            std::cout << "User: " << logout->userName << std::endl;
+            // TODO: needs account validation
+            LogoutRet ret;
+            send(_cSock, (char*)&ret, sizeof(LogoutRet), 0);
+            break;
+        }
+        default: {
+            header->length = 0;
+            header->cmd = CMD_ERROR;
+            send(_cSock, (char*)&header, sizeof(DataHeader), 0);
+            break;
+        }
+    }
+
+    return 0;
+}
+
+std::vector<SOCKET> clients_list = {};
 
 int main() {
     // launch windows socket 2.x environment
@@ -105,76 +169,96 @@ int main() {
         std::cout << "Listen to port successully" << std::endl;
     }
 
-
-    // 4. wait until accept an new client connection
-    // The accept function fills this structure with the address information of the client that is connecting.
-    sockaddr_in clientAddr = {};
-
-    // After the function call, it will be updated with the actual size of the client's address information.
-    int nAddrLen = sizeof(clientAddr);
-
-    SOCKET _cSock = INVALID_SOCKET;
-
-    _cSock = accept(_sock, (sockaddr*)&clientAddr, &nAddrLen);
-    if (INVALID_SOCKET == _cSock) {
-        std::cout << "Invalid Socket accepted" << std::endl;
-    }
-        
-    // ion converts an (Ipv4) Internet network address into an ASCII string in Internet standard dotted-decimal format
-    std::cout << "New client connected: socket = " << _cSock << ", ip = " << inet_ntoa(clientAddr.sin_addr) << std::endl;
-    
     while (true) {
         
-        // buffer for receiving data, this is still a fixed length buffer
-        char szRecv[1024] = {};
+        // fd_set: to place sockets into a "set" for various purposes, such as testing a given socket for readability using the readfds parameter of the select function
+        fd_set fdRead;
+        fd_set fdWrite;
+        fd_set fdExp;
 
-        // 5. keeping reading message from clients
-        //we only read header info from the incoming message
-        int nLen = recv(_cSock,(char*) szRecv, sizeof(DataHeader), 0);
-        DataHeader* header = (DataHeader*)szRecv;
-        if (nLen <= 0) {
+        // reset the count of each set to zero
+        FD_ZERO(&fdRead);
+        FD_ZERO(&fdWrite);
+        FD_ZERO(&fdExp);
+
+        // add socket _sock to each set to be monitor later when using select()
+        FD_SET(_sock, &fdRead);
+        FD_SET(_sock, &fdWrite);
+        FD_SET(_sock, &fdExp);
+
+        for (int n = (int)clients_list.size() - 1; n >= 0; n--) {
+            FD_SET(clients_list[n], &fdRead);
+        }
+
+        // fisrt arg: ignore, the nfds parameter is included only for compatibility with Berkeley sockets.
+        // last arg is timeout: The maximum time for select to wait for checking status of sockets
+        // allow a program to monitor multiple file descriptors, waiting until one or more of the file descriptors become "ready" for some class of I/O operation
+        int ret = select(_sock + 1, &fdRead, &fdWrite, &fdExp, NULL);
+        
+        // error happens when return value less than 0
+        if (ret < 0) {
+            std::cout << "=================" << std::endl;
+            std::cout << "Exception happens" << std::endl;
+            std::cout << "=================" << std::endl;
             break;
         }
-        
-        //if (nLen >= header->length) {};
 
-        // 6.process client request and send data to client
-        switch (header -> cmd) {
-            case CMD_LOGIN: {
-                // modify pointer to points to the member of subclass, since the member of parent class
-                // would be initialized before those of subclass
-                // at the same time, reduce the amount of data we need to read
-                recv(_cSock, szRecv + sizeof(DataHeader), header -> length - sizeof(DataHeader), 0);
-                Login* login = (Login*)szRecv;
-                std::cout << "Received message from client: " << login -> cmd << " message length: " << login -> length << std::endl;
-                std::cout << "User: " << login -> userName << " Password: " << login -> password << std::endl;
-                
-                LoginRet ret;
-                // TODO: needs account validation
-                // return header file before sending data
-                send(_cSock, (char*)&ret, sizeof(LoginRet), 0);
+        // the status of server socket is changed, which is, a client is trying to connect with server 
+        // create an new socket for current client and add it into client list
+        if (FD_ISSET(_sock, &fdRead)) {
+            // Clears the bit for the file descriptor fd in the file descriptor set fdRead, so that we can .
+            FD_CLR(_sock, &fdRead);
 
-                break;
+            // 4. wait until accept an new client connection
+            // The accept function fills this structure with the address information of the client that is connecting.
+            sockaddr_in clientAddr = {};
+
+            // After the function call, it will be updated with the actual size of the client's address information.
+            int nAddrLen = sizeof(clientAddr);
+
+            SOCKET _cSock = INVALID_SOCKET;
+
+            _cSock = accept(_sock, (sockaddr*)&clientAddr, &nAddrLen);
+            if (INVALID_SOCKET == _cSock) {
+                std::cout << "Invalid Socket accepted" << std::endl;
             }
-            case CMD_LOGOUT: {
-                recv(_cSock, szRecv + sizeof(DataHeader), header -> length - sizeof(DataHeader), 0);
-                Logout* logout = (Logout*)szRecv;
-                std::cout << "User: " << logout -> userName << std::endl;
-                // TODO: needs account validation
-                LogoutRet ret;
-                send(_cSock, (char*)&ret, sizeof(LogoutRet), 0);
-                break;
+                  
+            // ion converts an (Ipv4) Internet network address into an ASCII string in Internet standard dotted-decimal format
+            std::cout << "New client connected: socket = " << _cSock << ", ip = " << inet_ntoa(clientAddr.sin_addr) << std::endl;
+            
+            clients_list.push_back(_cSock);
+        }
+
+        // loop through all client sockets to process command
+        for (int n = 0; n < (int)fdRead.fd_count; n++) {
+            // connected client socket has been closed
+            if (processClient(fdRead.fd_array[n]) == -1) {
+                // find cloesd client socket and remove
+                std::cout << "client " << fdRead.fd_array[n] << " exit" << std::endl;
+                auto iter = find(clients_list.begin(), clients_list.end(), fdRead.fd_array[n]);
+                if (iter != clients_list.end() ) {
+                    // TODO: problem, should close socket before remove it 
+                    clients_list.erase(iter);
+                }
+
+                if (clients_list.size() == 0) {
+                    std::cout << "Do you want to close server ? type YES or NO";
+                    char command[12];
+                    std::cin >> command;
+                    if (strcmp(command, "YES")) {
+                        break;
+                    }
+                }
             }
-            default: {
-                header -> length = 0;
-                header -> cmd = CMD_ERROR;
-                send(_cSock, (char*)&header, sizeof(DataHeader), 0);
-                break;
-            }
-        } 
+        }
     }
 
-    // 7. close socket
+    // close all client sockets
+    for (int n = 0 ; n < (int)clients_list.size(); n++) {
+        closesocket(clients_list[n]);
+    }
+
+    // close server socket
     closesocket(_sock);
 
     // terminates use of the Winsock 2 DLL (Ws2_32.dll)
