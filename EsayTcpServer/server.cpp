@@ -190,10 +190,14 @@ int main() {
             FD_SET(clients_list[n], &fdRead);
         }
 
+        // setup time stamp to listen client connection, which means, 
+        // our server is non-blocking, and can process other request while listening to client socket
+        timeval t = { 0, 0 };
+
         // fisrt arg: ignore, the nfds parameter is included only for compatibility with Berkeley sockets.
         // last arg is timeout: The maximum time for select to wait for checking status of sockets
         // allow a program to monitor multiple file descriptors, waiting until one or more of the file descriptors become "ready" for some class of I/O operation
-        int ret = select(_sock + 1, &fdRead, &fdWrite, &fdExp, NULL);
+        int ret = select(_sock + 1, &fdRead, &fdWrite, &fdExp, &t);
         
         // error happens when return value less than 0
         if (ret < 0) {
@@ -242,7 +246,7 @@ int main() {
                 }
 
                 if (clients_list.size() == 0) {
-                    std::cout << "Do you want to close server ? type YES or NO";
+                    std::cout << "Do you want to close server ? type YES or NO" << std::endl;
                     char command[12];
                     std::cin >> command;
                     if (strcmp(command, "YES")) {
