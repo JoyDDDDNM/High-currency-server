@@ -9,13 +9,14 @@
 #include <windows.h>  // windows system api
 #include <WinSock2.h> // windows socket api 
 #include <vector>
-//#include <string>
+#include <string>
 
 enum CMD {
     CMD_LOGIN,
     CMD_LOGIN_RESULT,
     CMD_LOGOUT,
     CMD_LOGOUT_RESULT,
+    CMD_NEW_USER_JOIN,
     CMD_ERROR
 };
 
@@ -23,6 +24,7 @@ std::vector<std::string> allCommands = { "CMD_LOGIN",
                                         "CMD_LOGIN_RESULT",
                                         "CMD_LOGOUT",
                                         "CMD_LOGOUT_RESULT",
+                                        "CMD_NEW_USER_JOIN",
                                         "CMD_ERROR"};
 
 struct DataHeader {
@@ -63,6 +65,15 @@ struct LogoutRet : public DataHeader {
         result = 0;
     }
     int result;
+};
+
+struct NewUserJoin : public DataHeader {
+    NewUserJoin() {
+        length = sizeof(NewUserJoin);
+        cmd = CMD_NEW_USER_JOIN;
+        cSocket = 0;
+    }
+    int cSocket;
 };
 
 int processClient(SOCKET _cSock) {
@@ -192,13 +203,16 @@ int main() {
 
         // setup time stamp to listen client connection, which means, 
         // our server is non-blocking, and can process other request while listening to client socket
-        timeval t = { 0, 0 };
+        // set time stamp to 1 second to check if there are any connections from client
+        timeval t = { 1, 0 };
 
         // fisrt arg: ignore, the nfds parameter is included only for compatibility with Berkeley sockets.
         // last arg is timeout: The maximum time for select to wait for checking status of sockets
         // allow a program to monitor multiple file descriptors, waiting until one or more of the file descriptors become "ready" for some class of I/O operation
-        int ret = select(_sock + 1, &fdRead, &fdWrite, &fdExp, &t);
         
+        // drawback of select function: maximum size of fdset is 64, which means, there can be at most 64 clients connected to server
+        int ret = select(_sock + 1, &fdRead, &fdWrite, &fdExp, &t);
+
         // error happens when return value less than 0
         if (ret < 0) {
             std::cout << "=================" << std::endl;
@@ -227,12 +241,19 @@ int main() {
                 std::cout << "Invalid Socket accepted" << std::endl;
             }
                   
+            // send message to all client that there is an new client connected to server
+            for (int n = (int)clients_list.size() - 1; n >= 0; n--) {
+                NewUserJoin client;
+                client.cSocket = _cSock;
+                send(clients_list[n], (const char*)&client, sizeof(client), 0);
+            }
+
+            clients_list.push_back(_cSock);
             // ion converts an (Ipv4) Internet network address into an ASCII string in Internet standard dotted-decimal format
             std::cout << "New client connected: socket = " << _cSock << ", ip = " << inet_ntoa(clientAddr.sin_addr) << std::endl;
-            
-            clients_list.push_back(_cSock);
         }
 
+        bool isClosed = false;
         // loop through all client sockets to process command
         for (int n = 0; n < (int)fdRead.fd_count; n++) {
             // connected client socket has been closed
@@ -246,15 +267,19 @@ int main() {
                 }
 
                 if (clients_list.size() == 0) {
-                    std::cout << "Do you want to close server ? type YES or NO" << std::endl;
+                    std::cout << "No client connected to server,\nDo you want to shut down the server ? type YES or NO" << std::endl;
                     char command[12];
                     std::cin >> command;
                     if (strcmp(command, "YES")) {
-                        break;
+                        isClosed = true;
                     }
                 }
             }
         }
+
+        if (isClosed) break;
+
+        std::cout << "Server is idle and able to deal with other tasks" << std::endl;
     }
 
     // close all client sockets

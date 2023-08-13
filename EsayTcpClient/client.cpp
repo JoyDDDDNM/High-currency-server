@@ -6,13 +6,14 @@
 #include <iostream>
 #include <windows.h>  // windows system api
 #include <WinSock2.h> // windows socket api 
-
+#include <vector>
 
 enum CMD {
     CMD_LOGIN,
     CMD_LOGIN_RESULT,
     CMD_LOGOUT,
     CMD_LOGOUT_RESULT,
+    CMD_NEW_USER_JOIN,
     CMD_ERROR
 };
 
@@ -56,6 +57,63 @@ struct LogoutRet : public DataHeader {
     int result;
 };
 
+struct NewUserJoin : public DataHeader {
+    NewUserJoin() {
+        length = sizeof(NewUserJoin);
+        cmd = CMD_NEW_USER_JOIN;
+        cSocket = 0;
+    }
+    int cSocket;
+};
+
+
+int receiveServerMessage(SOCKET _cSock) {
+
+    // buffer for receiving data, this is still a fixed length buffer
+    char szRecv[1024] = {};
+
+    // 5. keeping reading message from clients
+    //we only read header info from the incoming message
+    int nLen = recv(_cSock, (char*)szRecv, sizeof(DataHeader), 0);
+    DataHeader* header = (DataHeader*)szRecv;
+    if (nLen <= 0) {
+        // connection has closed
+        std::cout << "server disconnected" << std::endl;
+        return -1;
+    }
+
+    switch (header->cmd) {
+        case CMD_LOGIN_RESULT: {
+            recv(_cSock, szRecv + sizeof(DataHeader), header -> length - sizeof(DataHeader), 0);
+            LoginRet* loginRet = (LoginRet*)szRecv;
+            std::cout << "Receive message from server: login successfully" << std::endl;
+            std::cout << "Message length: " << loginRet->length << std::endl;
+            break;
+        }
+        case CMD_LOGOUT_RESULT: {
+            recv(_cSock, szRecv + sizeof(DataHeader), header->length - sizeof(DataHeader), 0);
+            LogoutRet* logoutRet = (LogoutRet*)szRecv;
+            std::cout << "Receive message from server: logout successfully" << std::endl;
+            std::cout << "Message length: " << logoutRet->length << std::endl;
+            break;
+        }
+        case CMD_NEW_USER_JOIN: {
+            recv(_cSock, szRecv + sizeof(DataHeader), header->length - sizeof(DataHeader), 0);
+            NewUserJoin* newUser = (NewUserJoin*)szRecv;
+            std::cout << "Receive message from server: new user join into server" << std::endl;
+            std::cout << "user id: " << newUser -> cSocket << std::endl;
+            std::cout << "Message length: " << newUser->length << std::endl;
+            break;
+        }
+        default: {
+       
+            break;
+        }
+    }
+
+    return 0;
+}
+
 int main()
 {
     // launch windows socket 2.x environment
@@ -75,6 +133,7 @@ int main()
     }
 
     // 2. connect server
+    // https://stackoverflow.com/questions/21099041/why-do-we-cast-sockaddr-in-to-sockaddr-when-calling-bind
     sockaddr_in _sin = {};
     _sin.sin_family = AF_INET;
     _sin.sin_port = htons(4567); 
@@ -92,47 +151,38 @@ int main()
     // 3.process user input request
     char cmdBuf[128] = {};
     while (true) {
-        std::cout << ">> ";
-        std::cin >> cmdBuf;
-        if (strcmp(cmdBuf, "exit") == 0) {
-            // client exit
+
+        fd_set fdRead;
+        FD_ZERO(&fdRead);
+        FD_SET(_sock, &fdRead);
+
+        timeval t = { 1, 0 };
+
+        // client is blocked
+        int ret = select(_sock, &fdRead, 0, 0, &t);
+        if (ret < 0) {
+            std::cout << "server is closed " << std::endl;
             break;
-        } else if  (strcmp(cmdBuf, "login") == 0) {
-            Login login;
-            strcpy_s(login.userName, "account");
-            strcpy_s(login.password, "password");
-
-            send(_sock, (char*)&login, sizeof(Login), 0);
-
-            LoginRet loginRet= {};            
-            recv(_sock, (char*)&loginRet, sizeof(LoginRet), 0);
-            std::cout << "Received message from server: ";
-            std::cout << "Login result : " << loginRet.result << std::endl;
-
-        } else if (strcmp(cmdBuf, "logout") == 0) {
-            Logout logout = {};
-            strcpy_s(logout.userName, "account");
-            send(_sock, (char*)&logout, sizeof(Logout), 0);
-
-            LogoutRet logoutRet = {};
-            recv(_sock, (char*)&logoutRet, sizeof(LogoutRet), 0);
-            std::cout << "Received message from server: ";
-            std::cout << "Logout result : " << logoutRet.result << std::endl;
         }
-        else {
-            // not a valid command, listen next command
-            std::cout << "Not valid command" << std::endl;
-            continue;
+
+        if (FD_ISSET(_sock, &fdRead)) {
+            FD_CLR(_sock, &fdRead);
+
+            if (receiveServerMessage(_sock) == -1) {
+                break;
+            };
         }
+
+        std::cout << "Client is idle and able to deal with other tasks" << std::endl;
     }
 
     // 5. close socket 
     closesocket(_sock);
     WSACleanup();
 
-    /*std::cout << "exit" << std::endl;
-    std::cout << "press Enter to exit" << std::endl;
-    getchar();*/
+    std::cout << "Client exit" << std::endl;
+    std::cout << "Press Enter to exit" << std::endl;
+    getchar();
     return 0;
 }
 
