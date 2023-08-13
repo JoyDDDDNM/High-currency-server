@@ -124,24 +124,30 @@ int main() {
     std::cout << "New client connected: socket = " << _cSock << ", ip = " << inet_ntoa(clientAddr.sin_addr) << std::endl;
     
     while (true) {
-        DataHeader header = {};
+        
+        // buffer for receiving data, this is still a fixed length buffer
+        char szRecv[1024] = {};
+
         // 5. keeping reading message from clients
-        int nLen = recv(_cSock,(char*) &header, sizeof(DataHeader), 0);
+        //we only read header info from the incoming message
+        int nLen = recv(_cSock,(char*) szRecv, sizeof(DataHeader), 0);
+        DataHeader* header = (DataHeader*)szRecv;
         if (nLen <= 0) {
             break;
         }
         
+        //if (nLen >= header->length) {};
+
         // 6.process client request and send data to client
-        // strlen doesn't count the trailiing '\0'
-        switch (header.cmd) {
+        switch (header -> cmd) {
             case CMD_LOGIN: {
-                Login login = {};
                 // modify pointer to points to the member of subclass, since the member of parent class
                 // would be initialized before those of subclass
                 // at the same time, reduce the amount of data we need to read
-                recv(_cSock, (char*) &login + sizeof(DataHeader), sizeof(Login) - sizeof(DataHeader), 0);
-                std::cout << "Received message from client: " << login.cmd << " message length: " << login.length << std::endl;
-                std::cout << "User:" << login.userName << " Password: " << login.password << std::endl;
+                recv(_cSock, szRecv + sizeof(DataHeader), header -> length - sizeof(DataHeader), 0);
+                Login* login = (Login*)szRecv;
+                std::cout << "Received message from client: " << login -> cmd << " message length: " << login -> length << std::endl;
+                std::cout << "User: " << login -> userName << " Password: " << login -> password << std::endl;
                 
                 LoginRet ret;
                 // TODO: needs account validation
@@ -151,17 +157,17 @@ int main() {
                 break;
             }
             case CMD_LOGOUT: {
-                Logout logout = {};
-                recv(_cSock, (char*)&logout + sizeof(DataHeader), sizeof(logout) - sizeof(DataHeader), 0);
-                std::cout << "user:" << logout.userName << std::endl;
+                recv(_cSock, szRecv + sizeof(DataHeader), header -> length - sizeof(DataHeader), 0);
+                Logout* logout = (Logout*)szRecv;
+                std::cout << "User: " << logout -> userName << std::endl;
                 // TODO: needs account validation
                 LogoutRet ret;
                 send(_cSock, (char*)&ret, sizeof(LogoutRet), 0);
                 break;
             }
             default: {
-                header.cmd = CMD_ERROR;
-                header.length = 0;
+                header -> length = 0;
+                header -> cmd = CMD_ERROR;
                 send(_cSock, (char*)&header, sizeof(DataHeader), 0);
                 break;
             }

@@ -92,7 +92,7 @@ int main()
     // 3.process user input request
     char cmdBuf[128] = {};
     while (true) {
-        std::cout << "command<< ";
+        std::cout << ">> ";
         std::cin >> cmdBuf;
         if (strcmp(cmdBuf, "exit") == 0) {
             // client exit
