@@ -6,6 +6,7 @@
 #include <iostream>
 #include <windows.h>  // windows system api
 #include <WinSock2.h> // windows socket api 
+#include <thread>
 #include <vector>
 
 enum CMD {
@@ -114,6 +115,34 @@ int receiveServerMessage(SOCKET _cSock) {
     return 0;
 }
 
+bool isNotExit = true;
+
+void cmdThread(SOCKET _sock) {
+    while (true) {
+        char cmdBuf[256] = {};
+        if (strcmp(cmdBuf, "exit") == 0) {
+            std::cout << "sub thread finished" << std::endl;
+            // tell main thread that the sub thread is finished
+            isNotExit = false;
+            break;
+        }
+        else if (strcmp(cmdBuf, "login") == 0) {
+            Login login;
+            strcpy_s(login.userName, "account");
+            strcpy_s(login.password, "password");
+            send(_sock,(const char*)&login, sizeof(Login),0);
+        }
+        else if (strcmp(cmdBuf, "logout") == 0) {
+            Logout logout;
+            strcpy_s(logout.userName, "account");
+            send(_sock, (const char*)&logout, sizeof(Logout), 0);
+        }
+        else {
+            std::cout << "not valid command" << std::endl;
+        }
+    }
+}
+
 int main()
 {
     // launch windows socket 2.x environment
@@ -148,9 +177,16 @@ int main()
         std::cout << "server connect succeed" << std::endl;
     }
     
+    
+    // create an thread for reading client input
+    std::thread  clientCmdThread(cmdThread,_sock);
+    
+    // Separates the thread of execution from the thread object, 
+    // allowing execution to continue independently
+    clientCmdThread.detach();
+
     // 3.process user input request
-    char cmdBuf[128] = {};
-    while (true) {
+    while (isNotExit) {
 
         fd_set fdRead;
         FD_ZERO(&fdRead);

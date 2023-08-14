@@ -209,7 +209,8 @@ int main() {
         // fisrt arg: ignore, the nfds parameter is included only for compatibility with Berkeley sockets.
         // last arg is timeout: The maximum time for select to wait for checking status of sockets
         // allow a program to monitor multiple file descriptors, waiting until one or more of the file descriptors become "ready" for some class of I/O operation
-        
+        // when select find status of sockets change, it would clear all sockets and reload the sockets which has changed the status
+
         // drawback of select function: maximum size of fdset is 64, which means, there can be at most 64 clients connected to server
         int ret = select(_sock + 1, &fdRead, &fdWrite, &fdExp, &t);
 
@@ -240,17 +241,18 @@ int main() {
             if (INVALID_SOCKET == _cSock) {
                 std::cout << "Invalid Socket accepted" << std::endl;
             }
-                  
-            // send message to all client that there is an new client connected to server
-            for (int n = (int)clients_list.size() - 1; n >= 0; n--) {
-                NewUserJoin client;
-                client.cSocket = _cSock;
-                send(clients_list[n], (const char*)&client, sizeof(client), 0);
-            }
+            else {
+                // send message to all client that there is an new client connected to server
+                for (int n = (int)clients_list.size() - 1; n >= 0; n--) {
+                    NewUserJoin client;
+                    client.cSocket = _cSock;
+                    send(clients_list[n], (const char*)&client, sizeof(client), 0);
+                }
 
-            clients_list.push_back(_cSock);
-            // ion converts an (Ipv4) Internet network address into an ASCII string in Internet standard dotted-decimal format
-            std::cout << "New client connected: socket = " << _cSock << ", ip = " << inet_ntoa(clientAddr.sin_addr) << std::endl;
+                clients_list.push_back(_cSock);
+                // ion converts an (Ipv4) Internet network address into an ASCII string in Internet standard dotted-decimal format
+                std::cout << "New client connected: socket = " << _cSock << ", ip = " << inet_ntoa(clientAddr.sin_addr) << std::endl;
+            }
         }
 
         bool isClosed = false;
