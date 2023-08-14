@@ -267,12 +267,12 @@ int main() {
                     // TODO: problem, should close socket before remove it 
                     clients_list.erase(iter);
                 }
-
+                 
                 if (clients_list.size() == 0) {
                     std::cout << "No client connected to server,\nDo you want to shut down the server ? type YES or NO" << std::endl;
                     char command[12];
                     std::cin >> command;
-                    if (strcmp(command, "YES")) {
+                    if (strcmp(command, "YES") == 0) {
                         isClosed = true;
                     }
                 }
@@ -281,7 +281,7 @@ int main() {
 
         if (isClosed) break;
 
-        std::cout << "Server is idle and able to deal with other tasks" << std::endl;
+        //std::cout << "Server is idle and able to deal with other tasks" << std::endl;
     }
 
     // close all client sockets

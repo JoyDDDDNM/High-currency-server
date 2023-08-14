@@ -1,11 +1,27 @@
 // client.cpp : This file contains the 'main' function. Program execution begins and ends there.
 //
+
+// compile command in UNIX-like environment:
+// g++ client.cpp -std=c++11 -pthread -o client
+
 #define WIN32_LEAN_AND_MEAN // macro to avoid including duplicate macro when include <windows.h> and <WinSock2.h>
 #define _WINSOCK_DEPRECATED_NO_WARNINGS
+#define _CRT_SECURE_NO_WARNINGS
+
+#ifdef _WIN32
+    #include <windows.h>  // windows system api
+    #include <WinSock2.h> // windows socket api 
+#else
+    #include <unistd.h> // unix standard system interface
+    #include <arpa/inet.h>
+    #include <string>
+    
+    #define SOCKET int
+    #define INVALID_SOCKET  (SOCKET)(~0)
+    #define SOCKET_ERROR            (-1)
+#endif
 
 #include <iostream>
-#include <windows.h>  // windows system api
-#include <WinSock2.h> // windows socket api 
 #include <thread>
 #include <vector>
 
@@ -75,7 +91,7 @@ int receiveServerMessage(SOCKET _cSock) {
 
     // 5. keeping reading message from clients
     //we only read header info from the incoming message
-    int nLen = recv(_cSock, (char*)szRecv, sizeof(DataHeader), 0);
+    int nLen = (int)recv(_cSock, (char*)szRecv, sizeof(DataHeader), 0);
     DataHeader* header = (DataHeader*)szRecv;
     if (nLen <= 0) {
         // connection has closed
@@ -120,6 +136,7 @@ bool isNotExit = true;
 void cmdThread(SOCKET _sock) {
     while (true) {
         char cmdBuf[256] = {};
+        std::cin >> cmdBuf;
         if (strcmp(cmdBuf, "exit") == 0) {
             std::cout << "sub thread finished" << std::endl;
             // tell main thread that the sub thread is finished
@@ -128,13 +145,13 @@ void cmdThread(SOCKET _sock) {
         }
         else if (strcmp(cmdBuf, "login") == 0) {
             Login login;
-            strcpy_s(login.userName, "account");
-            strcpy_s(login.password, "password");
+            strcpy(login.userName, "account");
+            strcpy(login.password, "password");
             send(_sock,(const char*)&login, sizeof(Login),0);
         }
         else if (strcmp(cmdBuf, "logout") == 0) {
             Logout logout;
-            strcpy_s(logout.userName, "account");
+            strcpy(logout.userName, "account");
             send(_sock, (const char*)&logout, sizeof(Logout), 0);
         }
         else {
@@ -145,12 +162,14 @@ void cmdThread(SOCKET _sock) {
 
 int main()
 {
+#ifdef _WIN32
     // launch windows socket 2.x environment
     WORD ver = MAKEWORD(2, 2);
     WSADATA dat;
 
     // initiates use of the Winsock DLL by program.
     WSAStartup(ver, &dat);
+#endif
 
     // 1. build socket
     SOCKET _sock = socket(AF_INET,SOCK_STREAM,0);
@@ -166,7 +185,12 @@ int main()
     sockaddr_in _sin = {};
     _sin.sin_family = AF_INET;
     _sin.sin_port = htons(4567); 
+
+#ifdef _WIN32
     _sin.sin_addr.S_un.S_addr = inet_addr("127.0.0.1");
+#else
+    _sin.sin_addr.s_addr = inet_addr("192.168.0.116");
+#endif
 
     int ret = connect(_sock,(sockaddr*)&_sin, sizeof(sockaddr_in));
 
@@ -195,7 +219,7 @@ int main()
         timeval t = { 1, 0 };
 
         // client is blocked
-        int ret = select(_sock, &fdRead, 0, 0, &t);
+        int ret = select(_sock + 1, &fdRead, 0, 0, &t);
         if (ret < 0) {
             std::cout << "server is closed " << std::endl;
             break;
@@ -209,12 +233,17 @@ int main()
             };
         }
 
-        std::cout << "Client is idle and able to deal with other tasks" << std::endl;
+        //std::cout << "Client is idle and able to deal with other tasks" << std::endl;
     }
 
     // 5. close socket 
+
+#ifdef _WIN32
     closesocket(_sock);
     WSACleanup();
+#else
+    close(_sock);
+#endif
 
     std::cout << "Client exit" << std::endl;
     std::cout << "Press Enter to exit" << std::endl;
