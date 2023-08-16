@@ -6,16 +6,16 @@
 #define _WINSOCK_DEPRECATED_NO_WARNINGS
 
 #ifdef _WIN32
-    #define WIN32_LEAN_AND_MEAN // macro to avoid including duplicate macro when include <windows.h> and <WinSock2.h>
-    #include <windows.h>  // windows system api
-    #include <WinSock2.h> // windows socket api 
+#   define WIN32_LEAN_AND_MEAN // macro to avoid including duplicate macro when include <windows.h> and <WinSock2.h>
+#   include <windows.h>  // windows system api
+#   include <WinSock2.h> // windows socket api 
 #else
-    #include <unistd.h> // unix standard system interface
-    #include <arpa/inet.h>
+#   include <unistd.h> // unix standard system interface
+#   include <arpa/inet.h>
 
-    #define SOCKET int
-    #define INVALID_SOCKET  (SOCKET)(~0)
-    #define SOCKET_ERROR            (-1)
+#   define SOCKET int
+#   define INVALID_SOCKET  (SOCKET)(~0)
+#   define SOCKET_ERROR            (-1)
 #endif
 
 #include <iostream>
@@ -174,11 +174,11 @@ int main() {
     // if use 127.0.0.1, the socket will listen for incoming connections only on the loopback interface using that specific IP address
     // if use ip address of LAN, socket will be bound to that address with specficied port, and can listen to any packets from LAN or public network
     //inet_addr("127.0.0.1");
-#ifdef _WIN32
-    _sin.sin_addr.S_un.S_addr = INADDR_ANY;
-#else
-    _sin.sin_addr.s_addr = INADDR_ANY;
-#endif
+#   ifdef _WIN32
+        _sin.sin_addr.S_un.S_addr = INADDR_ANY;
+#   else
+        _sin.sin_addr.s_addr = INADDR_ANY;
+#   endif
 
     // 3. listen port 
     // determine if we bind port successfully

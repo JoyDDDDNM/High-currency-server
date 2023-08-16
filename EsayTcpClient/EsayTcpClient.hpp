@@ -2,17 +2,17 @@
 #define _EasyTcpClient_hpp_
 
 #ifdef _WIN32
-	#define WIN32_LEAN_AND_MEAN // macro to avoid including duplicate macro when include <windows.h> and <WinSock2.h>
-	#include <windows.h>  // windows system api
-	#include <WinSock2.h> // windows socket api 
+#	define WIN32_LEAN_AND_MEAN // macro to avoid including duplicate macro when include <windows.h> and <WinSock2.h>
+#	include <windows.h>  // windows system api
+#	include <WinSock2.h> // windows socket api 
 #else
-	#include <unistd.h> // unix standard system interface
-	#include <arpa/inet.h>
-	#include <string>
+#	include <unistd.h> // unix standard system interface
+#	include <arpa/inet.h>
+#	include <string>
 
-	#define SOCKET int
-	#define INVALID_SOCKET  (SOCKET)(~0)
-	#define SOCKET_ERROR            (-1)
+#	define SOCKET int
+#	define INVALID_SOCKET  (SOCKET)(~0)
+#	define SOCKET_ERROR            (-1)
 #endif
 
 #include <iostream>
@@ -28,14 +28,14 @@ public:
 	// initialize socket of client to connect server
 	int initSocket() {
 		// lanuch Win Sock 2.x environment
-#ifdef _WIN32
-		// launch windows socket 2.x environment
-		WORD ver = MAKEWORD(2, 2);
-		WSADATA dat;
+#		ifdef _WIN32
+			// launch windows socket 2.x environment
+			WORD ver = MAKEWORD(2, 2);
+			WSADATA dat;
 
-		// initiates use of the Winsock DLL by program.
-		WSAStartup(ver, &dat);
-#endif
+			// initiates use of the Winsock DLL by program.
+			WSAStartup(ver, &dat);
+#		endif
 		// socket has been created, close it and create an new one
 		if (INVALID_SOCKET != _sock) {
 			std::cout << "socket: " << _sock << " has been created previously, close it and recreate an new socket" << std::endl;
@@ -68,11 +68,11 @@ public:
 		_sin.sin_family = AF_INET;
 		_sin.sin_port = htons(port);
 
-#ifdef _WIN32
-		_sin.sin_addr.S_un.S_addr = inet_addr(ip);
-#else
-		_sin.sin_addr.s_addr = inet_addr(ip);
-#endif
+#		ifdef _WIN32
+			_sin.sin_addr.S_un.S_addr = inet_addr(ip);
+#		else
+			_sin.sin_addr.s_addr = inet_addr(ip);
+#		endif
 
 		int ret = connect(_sock, (sockaddr*)&_sin, sizeof(sockaddr_in));
 
@@ -89,13 +89,13 @@ public:
 	// close client socket
 	void closeSock() {
 		if (INVALID_SOCKET != _sock) {
-#ifdef _WIN32
-			closesocket(_sock);
-			WSACleanup();
-#else
-			close(_sock);
-#endif
-			_sock = INVALID_SOCKET;
+#			ifdef _WIN32
+				closesocket(_sock);
+				WSACleanup();
+#			else
+				close(_sock);
+#			endif
+				_sock = INVALID_SOCKET;
 		}
 	}
 
@@ -105,16 +105,18 @@ public:
 		if (!isRun()) {
 			return false;
 		}
+
 		fd_set fdRead;
 		FD_ZERO(&fdRead);
 		FD_SET(_sock, &fdRead);
 
 		timeval t = { 1, 0 };
 
-		// client is blocked
+		// client is blocked since the socket of server side is closed
 		int ret = select(_sock + 1, &fdRead, 0, 0, &t);
 		if (ret < 0) {
 			std::cout << "server is closed " << std::endl;
+			closeSock();
 			return false;
 		}
 
@@ -122,6 +124,7 @@ public:
 			FD_CLR(_sock, &fdRead);
 
 			if (receiveServerMessage(_sock) == -1) {
+				closeSock();
 				return false;
 			};
 		}
@@ -183,11 +186,10 @@ public:
 		}
 	}
 
+	// when user type message, send message to server
 	int sendMessage(DataHeader* header) {
-
 		if (isRun() && header) {
 			send(_sock, (const char*)header, header->length, 0);
-			
 		}
 
 		return SOCKET_ERROR;

@@ -64,7 +64,7 @@ int main()
         //std::cout << "Client is idle and able to deal with other tasks" << std::endl;
     }
 
-    client.closeSock();
+    //client.closeSock();
 
     std::cout << "Client exit" << std::endl;
     std::cout << "Press Enter to exit" << std::endl;
