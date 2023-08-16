@@ -1,13 +1,24 @@
 // server.cpp : This file contains the 'main' function. Program execution begins and ends there.
+// g++ server.cpp -std=c++11 -o server
 
 // TODO: accept command line argument to set up port number
 
-#define WIN32_LEAN_AND_MEAN // macro to avoid including duplicate macro when include <windows.h> and <WinSock2.h>
 #define _WINSOCK_DEPRECATED_NO_WARNINGS
 
+#ifdef _WIN32
+    #define WIN32_LEAN_AND_MEAN // macro to avoid including duplicate macro when include <windows.h> and <WinSock2.h>
+    #include <windows.h>  // windows system api
+    #include <WinSock2.h> // windows socket api 
+#else
+    #include <unistd.h> // unix standard system interface
+    #include <arpa/inet.h>
+
+    #define SOCKET int
+    #define INVALID_SOCKET  (SOCKET)(~0)
+    #define SOCKET_ERROR            (-1)
+#endif
+
 #include <iostream>
-#include <windows.h>  // windows system api
-#include <WinSock2.h> // windows socket api 
 #include <vector>
 #include <string>
 
@@ -83,7 +94,7 @@ int processClient(SOCKET _cSock) {
 
     // 5. keeping reading message from clients
     //we only read header info from the incoming message
-    int nLen = recv(_cSock, (char*)szRecv, sizeof(DataHeader), 0);
+    int nLen = (int)recv(_cSock, (char*)szRecv, sizeof(DataHeader), 0);
     DataHeader* header = (DataHeader*)szRecv;
     if (nLen <= 0) {
         // connection has closed
@@ -133,12 +144,14 @@ int processClient(SOCKET _cSock) {
 std::vector<SOCKET> clients_list = {};
 
 int main() {
+#ifdef _WIN32
     // launch windows socket 2.x environment
     WORD ver = MAKEWORD(2, 2);
     WSADATA dat;
-    
+
     // initiates use of the Winsock DLL by program.
     WSAStartup(ver, &dat);
+#endif
 
     // 1.build a socket
     // first argument: address family
@@ -160,9 +173,13 @@ int main() {
     // bind ip address ,
     // if use 127.0.0.1, the socket will listen for incoming connections only on the loopback interface using that specific IP address
     // if use ip address of LAN, socket will be bound to that address with specficied port, and can listen to any packets from LAN or public network
-    _sin.sin_addr.S_un.S_addr = INADDR_ANY;
     //inet_addr("127.0.0.1");
-    
+#ifdef _WIN32
+    _sin.sin_addr.S_un.S_addr = INADDR_ANY;
+#else
+    _sin.sin_addr.s_addr = INADDR_ANY;
+#endif
+
     // 3. listen port 
     // determine if we bind port successfully
     if (SOCKET_ERROR == bind(_sock, (sockaddr*)&_sin, sizeof(sockaddr_in))) {
@@ -197,8 +214,12 @@ int main() {
         FD_SET(_sock, &fdWrite);
         FD_SET(_sock, &fdExp);
 
+        // record the maximum number of fd in all scokets
+        SOCKET maxSock = _sock;
+
         for (int n = (int)clients_list.size() - 1; n >= 0; n--) {
             FD_SET(clients_list[n], &fdRead);
+            if (maxSock < clients_list[n]) maxSock = clients_list[n];
         }
 
         // setup time stamp to listen client connection, which means, 
@@ -212,7 +233,8 @@ int main() {
         // when select find status of sockets change, it would clear all sockets and reload the sockets which has changed the status
 
         // drawback of select function: maximum size of fdset is 64, which means, there can be at most 64 clients connected to server
-        int ret = select(_sock + 1, &fdRead, &fdWrite, &fdExp, &t);
+        
+        int ret = select(maxSock + 1, &fdRead, &fdWrite, &fdExp, &t);
 
         // error happens when return value less than 0
         if (ret < 0) {
@@ -236,8 +258,11 @@ int main() {
             int nAddrLen = sizeof(clientAddr);
 
             SOCKET _cSock = INVALID_SOCKET;
-
-            _cSock = accept(_sock, (sockaddr*)&clientAddr, &nAddrLen);
+            #ifdef _WIN32
+                _cSock = accept(_sock, (sockaddr*)&clientAddr, &nAddrLen);
+            #else
+                _cSock = accept(_sock, (sockaddr*)&clientAddr, (socklen_t*) & nAddrLen);
+            #endif
             if (INVALID_SOCKET == _cSock) {
                 std::cout << "Invalid Socket accepted" << std::endl;
             }
@@ -257,25 +282,29 @@ int main() {
 
         bool isClosed = false;
         // loop through all client sockets to process command
-        for (int n = 0; n < (int)fdRead.fd_count; n++) {
-            // connected client socket has been closed
-            if (processClient(fdRead.fd_array[n]) == -1) {
-                // find cloesd client socket and remove
-                std::cout << "client " << fdRead.fd_array[n] << " exit" << std::endl;
-                auto iter = find(clients_list.begin(), clients_list.end(), fdRead.fd_array[n]);
-                if (iter != clients_list.end() ) {
-                    // TODO: problem, should close socket before remove it 
-                    clients_list.erase(iter);
-                }
-                 
-                if (clients_list.size() == 0) {
-                    std::cout << "No client connected to server,\nDo you want to shut down the server ? type YES or NO" << std::endl;
-                    char command[12];
-                    std::cin >> command;
-                    if (strcmp(command, "YES") == 0) {
-                        isClosed = true;
+        for (int n = (int)clients_list.size() - 1; n >= 0; n--) {
+            if (FD_ISSET(clients_list[n], &fdRead)) {
+                // connected client socket has been closed
+                if (processClient(clients_list[n]) == -1) {
+                    // find cloesd client socket and remove
+                    std::cout << "client " << clients_list[n] << " exit" << std::endl;
+                    auto iter = clients_list.begin() + n ;
+                    //auto iter = clients_list.begin() + n;
+                    if (iter != clients_list.end()) {
+                        // TODO: problem, should close socket before remove it 
+                        clients_list.erase(iter);
+                    }
+
+                    if (clients_list.size() == 0) {
+                        std::cout << "No client connected to server,\nDo you want to shut down the server ? type YES or NO" << std::endl;
+                        char command[12];
+                        std::cin >> command;
+                        if (strcmp(command, "YES") == 0) {
+                            isClosed = true;
+                        }
                     }
                 }
+
             }
         }
 
@@ -284,20 +313,27 @@ int main() {
         //std::cout << "Server is idle and able to deal with other tasks" << std::endl;
     }
 
+
+#ifdef _WIN32
     // close all client sockets
     for (int n = 0 ; n < (int)clients_list.size(); n++) {
         closesocket(clients_list[n]);
     }
-
     // close server socket
     closesocket(_sock);
-
     // terminates use of the Winsock 2 DLL (Ws2_32.dll)
     WSACleanup();
+#else
+    for (int n = 0; n < (int)clients_list.size(); n++) {
+        close(clients_list[n]);
+    }
+    close(_sock);
+#endif
+
+
 
     std::cout << "server closed" << std::endl;
-    std::cout << "press Enter to exit" << std::endl;
-    getchar();
+    Sleep(1000);
     return 0;
 }
 

@@ -4,11 +4,11 @@
 // compile command in UNIX-like environment:
 // g++ client.cpp -std=c++11 -pthread -o client
 
-#define WIN32_LEAN_AND_MEAN // macro to avoid including duplicate macro when include <windows.h> and <WinSock2.h>
 #define _WINSOCK_DEPRECATED_NO_WARNINGS
 #define _CRT_SECURE_NO_WARNINGS
 
 #ifdef _WIN32
+    #define WIN32_LEAN_AND_MEAN // macro to avoid including duplicate macro when include <windows.h> and <WinSock2.h>
     #include <windows.h>  // windows system api
     #include <WinSock2.h> // windows socket api 
 #else
@@ -187,9 +187,9 @@ int main()
     _sin.sin_port = htons(4567); 
 
 #ifdef _WIN32
-    _sin.sin_addr.S_un.S_addr = inet_addr("127.0.0.1");
+    _sin.sin_addr.S_un.S_addr = inet_addr("192.168.0.100");
 #else
-    _sin.sin_addr.s_addr = inet_addr("192.168.0.116");
+    _sin.sin_addr.s_addr = inet_addr("192.168.0.100");
 #endif
 
     int ret = connect(_sock,(sockaddr*)&_sin, sizeof(sockaddr_in));
