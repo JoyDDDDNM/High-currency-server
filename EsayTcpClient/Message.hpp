@@ -1,4 +1,6 @@
 
+#ifndef _MESSAGE_HEADER_HPP_
+#define _MESSAGE_HEADER_HPP_
 enum CMD {
     CMD_LOGIN,
     CMD_LOGIN_RESULT,
@@ -56,3 +58,5 @@ struct NewUserJoin : public DataHeader {
     }
     int cSocket;
 };
+
+#endif
