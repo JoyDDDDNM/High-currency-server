@@ -23,7 +23,7 @@
 class EasyTcpClient
 {
 public:
-	EasyTcpClient() :_sock{ INVALID_SOCKET } {};
+	EasyTcpClient() :_sock{ INVALID_SOCKET } {}
 
 	// initialize socket of client to connect server
 	int initSocket() {
@@ -46,6 +46,7 @@ public:
 		_sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 		if (INVALID_SOCKET == _sock) {
 			std::cout << "socket create failed" << std::endl;
+			return -1;
 		}
 		else {
 			std::cout << "socket create succeed" << std::endl;
@@ -152,6 +153,7 @@ public:
 		return 0;
 	}
 
+	// check if socket is created
 	bool isRun() {
 		return _sock != INVALID_SOCKET;
 	}
@@ -202,5 +204,32 @@ public:
 private:
 	SOCKET _sock;
 };
+
+void cmdThread(EasyTcpClient* client) {
+	while (true) {
+		char cmdBuf[256] = {};
+		std::cin >> cmdBuf;
+		if (strcmp(cmdBuf, "exit") == 0) {
+			std::cout << "sub thread finished" << std::endl;
+			// tell main thread that the sub thread is finished
+			client->closeSock();
+			break;
+		}
+		else if (strcmp(cmdBuf, "login") == 0) {
+			Login login;
+			strcpy(login.userName, "account");
+			strcpy(login.password, "password");
+			client->sendMessage(&login);
+		}
+		else if (strcmp(cmdBuf, "logout") == 0) {
+			Logout logout;
+			strcpy(logout.userName, "account");
+			client->sendMessage(&logout);
+		}
+		else {
+			std::cout << "not valid command" << std::endl;
+		}
+	}
+}
 
 #endif
