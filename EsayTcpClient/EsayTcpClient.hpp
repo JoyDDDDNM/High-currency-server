@@ -9,11 +9,15 @@
 #	include <unistd.h> // unix standard system interface
 #	include <arpa/inet.h>
 #	include <string>
-
+#	include <string.h>
 #	define SOCKET int
 #	define INVALID_SOCKET  (SOCKET)(~0)
 #	define SOCKET_ERROR            (-1)
 #endif
+
+// base unit of buffer size
+#define RECV_BUFF_SIZE 10240
+
 
 #include <iostream>
 #include <vector>
@@ -23,7 +27,7 @@
 class EasyTcpClient
 {
 public:
-	EasyTcpClient() :_sock{ INVALID_SOCKET } {}
+	EasyTcpClient() :_sock{ INVALID_SOCKET }, _szRecv{ {} }, _szMsgRecv{ {} }, _offset{0} {}
 
 	// initialize socket of client to connect server
 	int initSocket() {
@@ -135,21 +139,50 @@ public:
 
 	// receive message from server, solve message concatenation
 	int receiveServerMessage(SOCKET _cSock) {
-		// buffer for receiving data, this is still a fixed length buffer
-		char szRecv[1024] = {};
-
-		// 5. keeping reading message from clients
+		// 5. keeping reading message from server
 		//we only read header info from the incoming message
-		int nLen = (int)recv(_cSock, (char*)szRecv, sizeof(DataHeader), 0);
-		DataHeader* header = (DataHeader*)szRecv;
+		int nLen = (int)recv(_cSock, _szRecv, RECV_BUFF_SIZE, 0);
 		if (nLen <= 0) {
 			// connection has closed
-			std::cout << "server disconnected" << std::endl;
 			return -1;
 		}
-		recv(_cSock, szRecv + sizeof(DataHeader), header->length - sizeof(DataHeader), 0);
+
+		// copy all messages from the received buffer to second buffer 
+		memcpy(_szMsgRecv + _offset, _szRecv, nLen);
+
+		// increase offset so that the next message will be moved to the end of the previous message
+		_offset += nLen;
+
+		// receive at least one full dataheader, 
+		// repeatedly process the incoming message, which solve packet concatenation
 		
-		processServerMessage(header);
+		while (_offset >= sizeof(DataHeader)) {
+			DataHeader* header = (DataHeader*)_szMsgRecv;
+
+			// receive a full message including data header
+			if (_offset >= header->length) {
+
+				// the length of all following messages
+				int shiftLen = _offset - header->length;
+
+				// TODO: receive the message body
+
+				processServerMessage(header);
+
+				// successfully processs the first message
+				// shift all following messages to the beginning of second buffer
+				memcpy(_szMsgRecv, _szMsgRecv + header->length, shiftLen);
+
+				_offset = shiftLen;
+				
+			}
+			else {
+				// the remaining message is not complete, wait for socket to receive the
+				// them until we get a full next message
+				break;
+			}
+		}
+
 		return 0;
 	}
 
@@ -181,8 +214,16 @@ public:
 				std::cout << "Message length: " << newUser->length << std::endl;
 				break;
 			}
+			case CMD_ERROR: {
+				/*NewUserJoin* newUser = (NewUserJoin*)header;
+				std::cout << "Receive message from server: new user join into server" << std::endl;
+				std::cout << "user id: " << newUser->cSocket << std::endl;
+				std::cout << "Message length: " << newUser->length << std::endl;*/
+				std::cout << "Error command received" << std::endl;
+				break;
+			}
 			default: {
-
+				std::cout << "Undefined message" << std::endl;
 				break;
 			}
 		}
@@ -203,6 +244,15 @@ public:
 
 private:
 	SOCKET _sock;
+
+	// buffer for receiving data, this is still a fixed length buffer
+	char _szRecv[RECV_BUFF_SIZE];
+
+	// second buffer to store data after we receive it from the buffer inside the OS
+	char _szMsgRecv[RECV_BUFF_SIZE * 10];
+
+	// offset pointer which points to the end a sequence of messages received from _szRecv
+	int _offset;
 };
 
 void cmdThread(EasyTcpClient* client) {
