@@ -7,6 +7,7 @@
 
 #include "EasyTcpServer.hpp"
 #include "Message.hpp"
+#include <thread>
 
 int main() {
 
@@ -14,18 +15,21 @@ int main() {
 
     server.initSocket();
 
-    server.bindPort(NULL,4567);
+    server.bindPort(nullptr,4567);
 
     server.listenNumber(5);
 
-    while (server.isRun()) {
-                
-        server.listenClient();
+    // create an thread for reading server input
+    std::thread serverCmdThread(cmdThread);
+    serverCmdThread.detach();
+
+    while (server.isRun() && isRun) {
+        if (!server.listenClient()) break;
     }
 
     server.closeSock();
 
     std::cout << "server closed" << std::endl;
-    Sleep(1000);
+    //Sleep(1000);
     return 0;
 }

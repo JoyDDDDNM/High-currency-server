@@ -15,9 +15,10 @@
 #	define SOCKET_ERROR            (-1)
 #endif
 
+#ifndef RECV_BUFF_SIZE 
 // base unit of buffer size
 #define RECV_BUFF_SIZE 10240
-
+#endif
 
 #include <iostream>
 #include <vector>
@@ -27,7 +28,7 @@
 class EasyTcpClient
 {
 public:
-	EasyTcpClient() :_sock{ INVALID_SOCKET }, _szRecv{ {} }, _szMsgRecv{ {} }, _offset{0} {}
+	EasyTcpClient() :_sock{ INVALID_SOCKET }, _szRecv{ {} }, _szMsgBuf{ {} }, _offset{0} {}
 
 	// initialize socket of client to connect server
 	int initSocket() {
@@ -148,7 +149,7 @@ public:
 		}
 
 		// copy all messages from the received buffer to second buffer 
-		memcpy(_szMsgRecv + _offset, _szRecv, nLen);
+		memcpy(_szMsgBuf + _offset, _szRecv, nLen);
 
 		// increase offset so that the next message will be moved to the end of the previous message
 		_offset += nLen;
@@ -157,7 +158,7 @@ public:
 		// repeatedly process the incoming message, which solve packet concatenation
 		
 		while (_offset >= sizeof(DataHeader)) {
-			DataHeader* header = (DataHeader*)_szMsgRecv;
+			DataHeader* header = (DataHeader*)_szMsgBuf;
 
 			// receive a full message including data header
 			if (_offset >= header->length) {
@@ -165,13 +166,12 @@ public:
 				// the length of all following messages
 				int shiftLen = _offset - header->length;
 
-				// TODO: receive the message body
-
+				// we dont need to receive the message body since 
 				processServerMessage(header);
 
 				// successfully processs the first message
 				// shift all following messages to the beginning of second buffer
-				memcpy(_szMsgRecv, _szMsgRecv + header->length, shiftLen);
+				memcpy(_szMsgBuf, _szMsgBuf + header->length, shiftLen);
 
 				_offset = shiftLen;
 				
@@ -195,7 +195,6 @@ public:
 	void processServerMessage(DataHeader* header) {
 		switch (header->cmd) {
 			case CMD_LOGIN_RESULT: {
-			
 				LoginRet* loginRet = (LoginRet*)header;
 				std::cout << "Receive message from server: login successfully" << std::endl;
 				std::cout << "Message length: " << loginRet->length << std::endl;
@@ -215,10 +214,10 @@ public:
 				break;
 			}
 			case CMD_ERROR: {
-				/*NewUserJoin* newUser = (NewUserJoin*)header;
+				NewUserJoin* newUser = (NewUserJoin*)header;
 				std::cout << "Receive message from server: new user join into server" << std::endl;
 				std::cout << "user id: " << newUser->cSocket << std::endl;
-				std::cout << "Message length: " << newUser->length << std::endl;*/
+				std::cout << "Message length: " << newUser->length << std::endl;
 				std::cout << "Error command received" << std::endl;
 				break;
 			}
@@ -249,7 +248,7 @@ private:
 	char _szRecv[RECV_BUFF_SIZE];
 
 	// second buffer to store data after we receive it from the buffer inside the OS
-	char _szMsgRecv[RECV_BUFF_SIZE * 10];
+	char _szMsgBuf[RECV_BUFF_SIZE * 10];
 
 	// offset pointer which points to the end a sequence of messages received from _szRecv
 	int _offset;

@@ -11,6 +11,10 @@ enum CMD {
 };
 
 struct DataHeader {
+    DataHeader() {
+        length = sizeof(DataHeader);
+        cmd = CMD_ERROR;
+    }
     short length;
     short cmd;
 };
@@ -22,6 +26,7 @@ struct Login : public DataHeader {
     }
     char userName[32];
     char password[32];
+    char data[932];
 };
 
 struct LoginRet : public DataHeader {
@@ -31,7 +36,7 @@ struct LoginRet : public DataHeader {
         result = 0;
     }
     int result;
-    char data[1024];
+    char data[992];
 };
 
 struct Logout : public DataHeader {

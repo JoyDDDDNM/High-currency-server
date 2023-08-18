@@ -39,9 +39,10 @@ int main()
     strcpy(login.userName, "account");
     strcpy(login.password, "password");
 
-    // 3.process user input request
     while (client.isRun()) {
+        // listen message from server
         client.listenServer();
+
         //client.sendMessage(&login);
         //std::cout << "Client is idle and able to deal with other tasks" << std::endl;
     }
