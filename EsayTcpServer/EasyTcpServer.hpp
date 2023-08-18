@@ -3,7 +3,12 @@
 
 #define _WINSOCK_DEPRECATED_NO_WARNINGS
 
-#ifdef _WIN32
+#ifdef _WIN32				
+// in Unix-like environment, the maximum size of fd_set is 1024
+// in windows environment, the maximum size of fd_set is 64
+// to ensure the consitentcy for cross-platform development, 
+// we can increase its size by refining this macro 
+#	define FD_SETSIZE 1024 
 #   define WIN32_LEAN_AND_MEAN // macro to avoid including duplicate macro when include <windows.h> and <WinSock2.h>
 #   include <windows.h>  // windows system api
 #   include <WinSock2.h> // windows socket api 
@@ -25,6 +30,8 @@
 #include <vector>
 #include <string>
 #include "Message.hpp"
+#include <iomanip>
+#include "CELLTimestamp.hpp"
 
 std::vector<std::string> allCommands = { "CMD_LOGIN",
 										"CMD_LOGIN_RESULT",
@@ -211,6 +218,7 @@ public:
 
 			// ion converts an (Ipv4) Internet network address into an ASCII string in Internet standard dotted-decimal format
 			std::cout << "Server socket " << _sock << " accept new client connection: client socket = " << cSock << ", ip = " << inet_ntoa(clientAddr.sin_addr) << std::endl;
+			std::cout << "current number of users: " << _clients_list.size() << std::endl;
 		}
 
 		return cSock;
@@ -311,8 +319,6 @@ public:
 			acceptClient();
 		}
 
-		bool stillRun = true;
-
 		// loop through all client sockets to process command
 		for (int n = (int)_clients_list.size() - 1; n >= 0; n--) {
 			if (FD_ISSET(_clients_list[n]->getSockfd(), &fdRead)) {
@@ -328,21 +334,11 @@ public:
 						// TODO: problem, should close socket before remove it 
 						_clients_list.erase(iter);
 					}
-
-					if (_clients_list.size() == 0) {
-						std::cout << "No client connected to server,\nDo you want to shut down the server ? type YES or NO" << std::endl;
-						char command[12];
-						std::cin >> command;
-						if (strcmp(command, "YES") == 0) {
-							stillRun = false;
-						}
-					}
 				}
-
 			}
 		}
 
-		return stillRun;
+		return true;
 		//std::cout << "Server is idle and able to deal with other tasks" << std::endl;
 
 	}
@@ -403,28 +399,39 @@ public:
 	// we use virutal to for inheritance
 	virtual void processClientMessage(SOCKET cSock, DataHeader* header) {
 		// 6.process client request and send data to client
+		_rectCount++;
+
+		auto t = _time.getElapsedSecond();
+
+		if ( t >= 1.0) {
+			std::cout << std::fixed << std::setprecision(6) << t << " second, server socket <" << _sock;
+			std::cout <<"> receive " << _rectCount << " packets" << std::endl;
+			_rectCount = 0;
+			_time.update();
+		}
+
 		switch (header->cmd) {
 		case CMD_LOGIN: {
 			// modify pointer to points to the member of subclass, since the member of parent class
 			// would be initialized before those of subclass
 			// at the same time, reduce the amount of data we need to read
 			Login* login = (Login*)header;
-			std::cout << "Received message from client: " << allCommands[login->cmd] << " message length: " << login->length << std::endl;
+			/*std::cout << "Received message from client: " << allCommands[login->cmd] << " message length: " << login->length << std::endl;
 			std::cout << "User: " << login->userName << " Password: " << login->password << std::endl;
 
 			LoginRet ret;
-			sendMessage(cSock, &ret);
+			sendMessage(cSock, &ret);*/
 			// TODO: needs account validation
 			// return header file before sending data
 			break;
 		}
 		case CMD_LOGOUT: {
 			Logout* logout = (Logout*)header;
-			std::cout << "Received message from client: " << allCommands[logout->cmd] << " message length: " << logout->length << std::endl;
-			std::cout << "User: " << logout->userName << std::endl;
-			// TODO: needs account validation
-			LogoutRet ret;
-			sendMessage(cSock, &ret);
+			//std::cout << "Received message from client: " << allCommands[logout->cmd] << " message length: " << logout->length << std::endl;
+			//std::cout << "User: " << logout->userName << std::endl;
+			//// TODO: needs account validation
+			//LogoutRet ret;
+			//sendMessage(cSock, &ret);
 			break;
 		}
 		default: {
@@ -471,6 +478,9 @@ private:
 	// buffer for receiving data, this is still a fixed length buffer
 	char _szRecv[RECV_BUFF_SIZE];
 
+	CELLTimestamp _time;
+
+	int _rectCount;
 };
 
 bool isRun = true;

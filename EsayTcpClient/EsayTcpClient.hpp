@@ -254,26 +254,29 @@ private:
 	int _offset;
 };
 
-void cmdThread(EasyTcpClient* client) {
+bool isRun = true;
+void cmdThread() {
+//void cmdThread(EasyTcpClient* client) {
 	while (true) {
 		char cmdBuf[256] = {};
 		std::cin >> cmdBuf;
 		if (strcmp(cmdBuf, "exit") == 0) {
 			std::cout << "sub thread finished" << std::endl;
 			// tell main thread that the sub thread is finished
-			client->closeSock();
+			isRun = false;
+			//client->closeSock();
 			break;
 		}
 		else if (strcmp(cmdBuf, "login") == 0) {
 			Login login;
 			strcpy(login.userName, "account");
 			strcpy(login.password, "password");
-			client->sendMessage(&login);
+			//client->sendMessage(&login);
 		}
 		else if (strcmp(cmdBuf, "logout") == 0) {
 			Logout logout;
 			strcpy(logout.userName, "account");
-			client->sendMessage(&logout);
+			//client->sendMessage(&logout);
 		}
 		else {
 			std::cout << "not valid command" << std::endl;
