@@ -2,12 +2,12 @@
 #define _EasyTcpClient_hpp_
 
 #ifdef _WIN32
-#	define WIN32_LEAN_AND_MEAN // macro to avoid including duplicate macro when include <windows.h> and <WinSock2.h>
-#	include <windows.h>  // windows system api
-#	include <WinSock2.h> // windows socket api 
+#	define WIN32_LEAN_AND_MEAN	// macro to avoid including duplicate macro when include <windows.h> and <WinSock2.h>
+#	include <windows.h>			// windows system api
+#	include <WinSock2.h>		// windows socket api 
 #else
-#	include <unistd.h> // unix standard system interface
-#	include <arpa/inet.h>
+#	include <unistd.h>			// unix standard symbolic constants and types
+#	include <arpa/inet.h>		//definitions for internet operations
 #	include <string>
 #	include <string.h>
 #	define SOCKET int
@@ -257,7 +257,7 @@ private:
 bool isRun = true;
 void cmdThread() {
 //void cmdThread(EasyTcpClient* client) {
-	while (true) {
+	while (isRun) {
 		char cmdBuf[256] = {};
 		std::cin >> cmdBuf;
 		if (strcmp(cmdBuf, "exit") == 0) {

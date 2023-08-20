@@ -75,7 +75,7 @@ private:
 class EasyTcpServer
 {
 public:
-	EasyTcpServer() :_sock{ INVALID_SOCKET }, _szRecv{ {} } {}
+	EasyTcpServer() :_sock{ INVALID_SOCKET }, _szRecv{ {} }, _time{}, _rectCount{0} {}
 
 	// initialize server socket
 	SOCKET initSocket() {
@@ -94,18 +94,18 @@ public:
 		// third: protocol type
 		// socket has been created, close it and create an new one
 		if (INVALID_SOCKET != _sock) {
-			std::cout << "socket: " << _sock << " has been created previously, close it and recreate an new socket" << std::endl;
+			std::cout << "Socket: " << _sock << " has been created previously, close it and recreate an new socket" << std::endl;
 			closeSock();
 		}
 
 		// 1. build socket
 		_sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 		if (INVALID_SOCKET == _sock) {
-			std::cout << "socket create failed" << std::endl;
+			std::cout << "Socket create failed" << std::endl;
 			return -1;
 		}
 		else {
-			std::cout << "socket create succeed" << std::endl;
+			std::cout << "Socket " << _sock << " create succeed" << std::endl;
 		}
 
 		// return socket number

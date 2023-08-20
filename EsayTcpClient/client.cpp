@@ -9,71 +9,71 @@
 #include "EsayTcpClient.hpp"
 #include <thread>
 
+// number of threads
+const int tCount = 4;
+
+// number of clients per thread
+const int cCount = 1000;
+
+// clients array, it needs to be global so that each client in child thread can access it
+EasyTcpClient* clients[cCount];
+
+void childThread(int id) {
+
+	int begin = (id - 1) * (cCount / tCount);
+	int end = (id) * (cCount / tCount);
+
+	for (int n = begin; n < end; n++) {
+		if (!isRun) return;
+		clients[n] = new EasyTcpClient();
+	}
+
+	for (int n = begin; n < end; n++) {
+		if (!isRun) return;
+		clients[n]->initSocket();
+		clients[n]->connectServer("127.0.0.1", 4567);
+	}
+
+	Login login;
+	strcpy(login.userName, "account");
+	strcpy(login.password, "password");
+
+	while (isRun) {
+		// listen message from server
+		//client.listenServer();
+
+		//client.sendMessage(&login);
+		//std::cout << "Client is idle and able to deal with other tasks" << std::endl;
+		for (int n = begin; n < end; n++) {
+			clients[n]->sendMessage(&login);
+		}
+
+	}
+
+	for (int n = begin; n < end; n++) {
+		clients[n]->closeSock();
+	}
+}
+
 int main()
-{
-    const int cCount = 10;
+{	
+	// UI thread: create an thread for reading client input
+	std::thread clientCmdThread(cmdThread);
 
-    EasyTcpClient* clients[cCount];
+	// Separates the thread of execution from the thread object, 
+	// allowing execution to continue independently
+	clientCmdThread.detach();
 
-    for (int n = 0; n < cCount; n++) {
-        if (!isRun) return 0;
-        clients[n] = new EasyTcpClient();
-    }
- 
-    for (int n = 0; n < cCount; n++) {
-        if (!isRun) return 0;
-        clients[n]->initSocket();
-        clients[n]->connectServer("127.0.0.1", 4567);
-    }
+	// initialize threads
+	for (int n = 0; n < tCount; n++) {
+		std::thread t1(childThread, n+1);
+		t1.detach();
+	}
 
-    //EasyTcpClient client;
+	while (isRun) continue;
 
-    //client.initSocket();
-
-    /*char ipAddr[20];
-    std::cout << "Enter Ip for connection: ";
-
-    std::cin >> ipAddr;*/
-
-    //client.connectServer("127.0.0.1", 4567);
-
-    // we can add more clients to connnect different servers or ports
-    // EasyTcpClient client2
-    // client2.initSocket
-    // client2.connectServer("127.0.0.1", 4567);
-    // std::thread  clientCmdThread2(cmdThread, &client2);
-
-    // create an thread for reading client input
-    std::thread clientCmdThread(cmdThread);
-    
-    // Separates the thread of execution from the thread object, 
-    // allowing execution to continue independently
-    clientCmdThread.detach();
-
-    Login login;
-    strcpy(login.userName, "account");
-    strcpy(login.password, "password");
-
-    while (isRun) { 
-        // listen message from server
-        //client.listenServer();
-
-        //client.sendMessage(&login);
-        //std::cout << "Client is idle and able to deal with other tasks" << std::endl;
-        for (int n = 0; n < cCount; n++) {
-            clients[n]->sendMessage(&login);
-        }
-
-    }
-
-    for (int n = 0; n < cCount; n++) {
-        clients[n]->closeSock();
-    }
-
-    //client.closeSock();
-
-    std::cout << "Client exit" << std::endl;
-    std::cout << "Press Enter to exit" << std::endl;
-    getchar();
-    return 0;
+	std::cout << "Client exit" << std::endl;
+	std::cout << "Press Enter to exit" << std::endl;
+	getchar();
+	return 0;
 }
