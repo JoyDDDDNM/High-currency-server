@@ -53,9 +53,6 @@ public:
 			std::cout << "socket create failed" << std::endl;
 			return -1;
 		}
-		else {
-			std::cout << "socket create succeed" << std::endl;
-		}
 
 		return 0;
 	}
@@ -83,10 +80,10 @@ public:
 		int ret = connect(_sock, (sockaddr*)&_sin, sizeof(sockaddr_in));
 
 		if (SOCKET_ERROR == ret) {
-			std::cout << "server connect failed" << std::endl;
+			std::cout << "Server connect failed" << std::endl;
 		}
 		else {
-			std::cout << "server connect succeed" << std::endl;
+			std::cout << "Server connect succeed" << std::endl;
 		}
 
 		return ret;
@@ -230,11 +227,16 @@ public:
 
 	// when user type message, send message to server
 	int sendMessage(DataHeader* header) {
+		int ret = SOCKET_ERROR;
+		
 		if (isRun() && header) {
-			send(_sock, (const char*)header, header->length, 0);
+			ret = send(_sock, (const char*)header, header -> length, 0);
+
+			// server is close, needs to close client socket
+			if (ret == SOCKET_ERROR) closeSock();
 		}
 
-		return SOCKET_ERROR;
+		return ret;
 	}
 
 	virtual ~EasyTcpClient() {

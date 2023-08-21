@@ -19,17 +19,16 @@ const int cCount = 1000;
 EasyTcpClient* clients[cCount];
 
 void childThread(int id) {
+	if (!isRun) return;
 
 	int begin = (id - 1) * (cCount / tCount);
 	int end = (id) * (cCount / tCount);
 
 	for (int n = begin; n < end; n++) {
-		if (!isRun) return;
 		clients[n] = new EasyTcpClient();
 	}
 
 	for (int n = begin; n < end; n++) {
-		if (!isRun) return;
 		clients[n]->initSocket();
 		clients[n]->connectServer("127.0.0.1", 4567);
 	}
@@ -38,20 +37,19 @@ void childThread(int id) {
 	strcpy(login.userName, "account");
 	strcpy(login.password, "password");
 
-	while (isRun) {
-		// listen message from server
-		//client.listenServer();
-
-		//client.sendMessage(&login);
-		//std::cout << "Client is idle and able to deal with other tasks" << std::endl;
+	while (isRun) { 
 		for (int n = begin; n < end; n++) {
+			// listen message from server
+			//clients[n]->listenServer();
+
+			// keep sending message to server for pressure test
 			clients[n]->sendMessage(&login);
 		}
-
 	}
 
 	for (int n = begin; n < end; n++) {
 		clients[n]->closeSock();
+		delete clients[n];
 	}
 }
 
@@ -70,8 +68,13 @@ int main()
 		t1.detach();
 	}
 
-	while (isRun) continue;
+	while (isRun) {
+		std::chrono::milliseconds t(100);
+		std::this_thread::sleep_for(t);
+		continue;
+	}
 
+	//std::cout << count << std::endl;
 	std::cout << "Client exit" << std::endl;
 	std::cout << "Press Enter to exit" << std::endl;
 	getchar();

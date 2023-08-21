@@ -19,12 +19,14 @@ int main() {
 
     server.listenNumber(5);
 
+    server.Start(4);
+
     // create an thread for reading server input
     std::thread serverCmdThread(cmdThread);
     serverCmdThread.detach();
 
-    while (server.isRun() && isRun) {
-        if (!server.listenClient()) break;
+    while (isRun) {
+        server.onRun();
     }
 
     server.closeSock();
