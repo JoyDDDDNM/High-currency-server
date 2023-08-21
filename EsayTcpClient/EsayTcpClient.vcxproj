@@ -147,7 +147,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="multiClients.cpp" />
+    <ClCompile Include="client.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="EsayTcpClient.hpp" />
