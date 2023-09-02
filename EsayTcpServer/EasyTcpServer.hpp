@@ -10,8 +10,8 @@
 // we can increase its size by refining this macro 
 #	define FD_SETSIZE 1024 
 #   define WIN32_LEAN_AND_MEAN // macro to avoid including duplicate macro when include <windows.h> and <WinSock2.h>
-#   include <windows.h>  // windows system api
-#   include <WinSock2.h> // windows socket api 
+#include <windows.h>  // windows system api
+#include <WinSock2.h> // windows socket api 
 #else
 #   include <unistd.h> // unix standard system interface
 #   include <arpa/inet.h>
@@ -32,6 +32,8 @@
 #include <iomanip>
 #include <mutex>
 #include <functional>
+#include <thread>
+#include <atomic>
 #include "Message.hpp"
 #include "CELLTimestamp.hpp"
 
@@ -513,7 +515,7 @@ public:
 	void addClientToChild(ClientSocket* client) {
 		OnJoin(client);
 		
-		// load banlance: choose a child server which contains least clients
+		// Least connection method to assign client to one of the child server
 		auto minClientServer = _child_servers[0];
 
 		for (auto childServer : _child_servers) {
@@ -698,8 +700,6 @@ private:
 	SOCKET _sock;
 
 	// all client sockets connected with server, 
-	// we allocate its memory on heap to avoid stack overflow
-	// since each size of object is large
 	// this clients list is for message broadcast
 	std::vector<ClientSocket*> _clients_list;
 

@@ -1,13 +1,13 @@
 // server.cpp : This file contains the 'main' function. Program execution begins and ends there.
-// g++ server.cpp -std=c++11 -o server
+// Windows: g++ server.cpp -std=c++11 -o server -lws2_32
+// add -lws2_32 flag to link winsocket dependency
+// Unix-like: g++ server.cpp -std=c++11 -o server 
 
 // TODO: accept command line argument to set up port number
 
 #define _WINSOCK_DEPRECATED_NO_WARNINGS
 
 #include "EasyTcpServer.hpp"
-#include "Message.hpp"
-#include <thread>
 
 int main() {
 
